@@ -2,43 +2,23 @@ document.addEventListener('DOMContentLoaded', function () {
     // DOM Elements
     const userEmail = document.getElementById('userEmail');
     const sidebarUserEmail = document.getElementById('sidebarUserEmail');
-    const addJobBtn = document.getElementById('addJobBtn');
-    const addJobModal = document.getElementById('addJobModal');
-    const saveJobBtn = document.getElementById('saveJobBtn');
-    const cancelJobBtn = document.getElementById('cancelJobBtn');
     const jobsList = document.getElementById('jobsList');
-    const jobForm = document.getElementById('jobForm');
     const logoutBtn = document.getElementById('logoutBtn');
     
-    // Modal elements
-    const deleteConfirmationModal = document.getElementById('deleteConfirmationModal');
-    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    // Stat Card Elements
+    const totalAppsCard = document.getElementById('totalAppsCard');
+    const interviewCard = document.getElementById('interviewCard');
+    const offerCard = document.getElementById('offerCard');
+    const rejectedCard = document.getElementById('rejectedCard');
+
+    // Filter Elements
+    const filterStatus = document.getElementById('filterStatus');
+    const filterText = document.getElementById('filterText');
+    const clearFilterBtn = document.getElementById('clearFilterBtn');
     
-    // Notification element
-    const notificationCard = document.getElementById('notificationCard');
-
-    // Form fields
-    const jobRole = document.getElementById('jobRole');
-    const jobCompany = document.getElementById('jobCompany');
-    const jobStatus = document.getElementById('jobStatus');
-    const jobDate = document.getElementById('jobDate');
-
     // State variables
     let currentUser = null;
-    let currentlyEditingJobId = null; // **FIX:** This variable is now properly declared
-
-    // --- Helper Function for Notifications ---
-    function showNotification(message, isSuccess = true) {
-        const bgColor = isSuccess ? 'bg-green-100' : 'bg-red-100';
-        const icon = isSuccess ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-times-circle text-red-500"></i>';
-        notificationCard.innerHTML = `<div class="${bgColor} p-4 rounded-lg flex items-center shadow-md">${icon}<span class="ml-2 text-sm font-medium">${message}</span></div>`;
-        
-        notificationCard.classList.remove('hidden');
-        setTimeout(() => {
-            notificationCard.classList.add('hidden');
-        }, 4000);
-    }
+    let allJobs = []; // A local cache for all job documents
 
     // --- Firebase Auth State Listener ---
     auth.onAuthStateChanged((user) => {
@@ -46,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function () {
             currentUser = user;
             userEmail.textContent = user.email;
             sidebarUserEmail.textContent = user.email; 
-            loadJobs();
+            fetchAllJobsAndRender(); // Initial load
         } else {
             window.location.href = 'auth.html';
         }
@@ -57,79 +37,70 @@ document.addEventListener('DOMContentLoaded', function () {
         auth.signOut();
     });
 
-    // --- Modal Controls ---
-    addJobBtn.addEventListener('click', () => {
-        jobForm.reset();
-        document.querySelector('#addJobModal h2').textContent = 'Add New Application';
-        addJobModal.classList.remove('hidden');
-    });
-    cancelJobBtn.addEventListener('click', () => {
-        addJobModal.classList.add('hidden');
-    });
+    // --- Event Listeners for Filtering ---
+    totalAppsCard.addEventListener('click', () => renderJobs()); // No filter
+    interviewCard.addEventListener('click', () => renderJobs('Interview'));
+    offerCard.addEventListener('click', () => renderJobs('Offer'));
+    rejectedCard.addEventListener('click', () => renderJobs('Rejected'));
+    clearFilterBtn.addEventListener('click', () => renderJobs()); // No filter
 
-    // --- Save Job Logic ---
-    jobForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const jobData = {
-            role: jobRole.value.trim(),
-            company: jobCompany.value.trim(),
-            status: jobStatus.value,
-            appliedDate: jobDate.value,
-            userId: currentUser.uid,
-        };
-
-        if (!jobData.role || !jobData.company || !jobData.appliedDate) {
-            showNotification("Please fill out all fields.", false);
-            return;
-        }
-
+    // --- Fetches all jobs from Firestore and stores them locally ---
+    async function fetchAllJobsAndRender() {
         try {
-            await db.collection('jobs').add(jobData);
-            addJobModal.classList.add('hidden');
-            jobForm.reset();
-            loadJobs();
-            showNotification('Job saved successfully!');
+            const querySnapshot = await db.collection('jobs')
+                .where('userId', '==', currentUser.uid)
+                .orderBy('appliedDate', 'desc')
+                .get();
+            
+            allJobs = querySnapshot.docs; // Store all docs in our local cache
+            renderJobs(); // Render all jobs initially
         } catch (error) {
-            console.error("Error saving job:", error);
-            showNotification('Failed to save job.', false);
+            console.error('Error fetching jobs:', error);
+            jobsList.innerHTML = `<div class="bg-red-100 p-4 rounded-md text-red-700">Error: ${error.message}</div>`;
         }
-    });
-   
-    // --- Load Jobs & Stats ---
-    async function loadJobs() {
-        const querySnapshot = await db.collection('jobs')
-            .where('userId', '==', currentUser.uid)
-            .orderBy('appliedDate', 'desc')
-            .get();
+    }
 
+    // --- Renders jobs based on the local cache and an optional filter ---
+    function renderJobs(statusFilter = null) {
+        // 1. Calculate stats based on the complete list of jobs
         let interviewCount = 0, offerCount = 0, rejectedCount = 0;
-
-        querySnapshot.forEach(doc => {
+        allJobs.forEach(doc => {
             const job = doc.data();
             if (job.status === 'Interview') interviewCount++;
             else if (job.status === 'Offer') offerCount++;
             else if (job.status === 'Rejected') rejectedCount++;
         });
 
-        document.getElementById('totalAppsStat').textContent = querySnapshot.size;
+        document.getElementById('totalAppsStat').textContent = allJobs.length;
         document.getElementById('interviewStat').textContent = interviewCount;
         document.getElementById('offerStat').textContent = offerCount;
         document.getElementById('rejectedStat').textContent = rejectedCount;
 
-        if (querySnapshot.empty) {
-            jobsList.innerHTML = '<p class="text-center text-gray-500 mt-8">No applications yet. Add your first one!</p>';
+        // 2. Filter the jobs to be displayed
+        let jobsToDisplay = allJobs;
+        if (statusFilter) {
+            jobsToDisplay = allJobs.filter(doc => doc.data().status === statusFilter);
+            filterStatus.classList.remove('hidden');
+            filterText.textContent = `${statusFilter} Applications`;
+        } else {
+            filterStatus.classList.add('hidden');
+        }
+
+        // 3. Render the filtered list of job cards
+        jobsList.innerHTML = ''; // Clear the current list
+        if (jobsToDisplay.length === 0) {
+            jobsList.innerHTML = `<p class="text-center text-gray-500 mt-8">No applications found for this filter.</p>`;
             return;
         }
 
-        jobsList.innerHTML = '';
-        querySnapshot.forEach(doc => {
+        jobsToDisplay.forEach(doc => {
             const job = doc.data();
             job.id = doc.id;
             createJobCard(job);
         });
     }
 
-    // --- Create Job Card ---
+    // --- Creates a single job card element ---
     function createJobCard(job) {
         const cardLink = document.createElement('a');
         cardLink.href = `applicationView.html?id=${job.id}`;
@@ -145,43 +116,12 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
             <div class="flex justify-between items-center mt-4">
                 <p class="text-sm text-gray-500">Applied: ${job.appliedDate}</p>
-                <button data-id="${job.id}" class="delete-job-btn text-gray-400 hover:text-red-500 text-sm">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
             </div>
         `;
         
         jobsList.appendChild(cardLink);
-
-        cardLink.querySelector('.delete-job-btn').addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const jobId = e.currentTarget.dataset.id;
-            confirmDeleteBtn.dataset.jobId = jobId;
-            deleteConfirmationModal.classList.remove('hidden');
-        });
     }
 
-    // --- Delete Job Logic ---
-    async function deleteJob(jobId) {
-        try {
-            await db.collection('jobs').doc(jobId).delete();
-            loadJobs();
-            showNotification('Application deleted.');
-        } catch (error) {
-            console.error('Error deleting job:', error);
-            showNotification('Failed to delete application.', false);
-        }
-    }
-    
-    // Event listeners for the delete confirmation modal
-    confirmDeleteBtn.addEventListener('click', () => {
-        const jobId = confirmDeleteBtn.dataset.jobId;
-        deleteJob(jobId);
-        deleteConfirmationModal.classList.add('hidden');
-    });
-
-    cancelDeleteBtn.addEventListener('click', () => {
-        deleteConfirmationModal.classList.add('hidden');
-    });
+    // Note: Add/Delete/Update logic would go here, and after each action,
+    // you would call fetchAllJobsAndRender() to refresh the data.
 });
