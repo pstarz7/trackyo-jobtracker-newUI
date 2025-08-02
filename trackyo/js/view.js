@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteNoteModal = document.getElementById('deleteNoteModal');
     const confirmNoteDelete = document.getElementById('confirmNoteDelete');
     const cancelNoteDelete = document.getElementById('cancelNoteDelete');
-    let noteToDelete = null; // To store the note object to be deleted
+    let noteToDelete = null;
 
     // Notification Element
     const notificationCard = document.getElementById('notificationCard');
@@ -36,44 +36,35 @@ document.addEventListener('DOMContentLoaded', () => {
     function showNotification(message, isSuccess = true) {
         const bgColor = isSuccess ? 'bg-green-100' : 'bg-red-100';
         const icon = isSuccess ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-times-circle text-red-500"></i>';
-        notificationCard.innerHTML = `<div class="${bgColor} p-4 rounded-lg flex items-center shadow-md">${icon}<span class="ml-2">${message}</span></div>`;
+        notificationCard.innerHTML = `<div class="${bgColor} p-4 rounded-lg flex items-center shadow-md">${icon}<span class="ml-2 text-sm font-medium">${message}</span></div>`;
         notificationCard.classList.remove('hidden');
         setTimeout(() => notificationCard.classList.add('hidden'), 4000);
     }
 
-    // --- Renders a single note with a delete button ---
-    function renderNote(note, index) {
+    // --- Renders a single note ---
+    function renderNote(note) {
         const noteDiv = document.createElement('div');
-        noteDiv.className = 'bg-gray-50 p-3 rounded-md border flex justify-between items-start';
-        noteDiv.setAttribute('data-note-index', index); // Keep track of the note's position
-
-        const contentDiv = document.createElement('div');
-        const noteText = document.createElement('p');
-        noteText.textContent = note.text;
-        const noteTimestamp = document.createElement('p');
-        noteTimestamp.className = 'text-xs text-gray-500 mt-1';
-        noteTimestamp.textContent = new Date(note.timestamp.seconds * 1000).toLocaleString();
-        
-        contentDiv.appendChild(noteText);
-        contentDiv.appendChild(noteTimestamp);
-
-        const deleteButton = document.createElement('button');
-        deleteButton.innerHTML = '<i class="fas fa-trash-alt text-gray-400 hover:text-red-500"></i>';
-        deleteButton.onclick = () => {
-            noteToDelete = note; // Store the note object
-            deleteNoteModal.classList.remove('hidden');
-        };
-
-        noteDiv.appendChild(contentDiv);
-        noteDiv.appendChild(deleteButton);
+        noteDiv.className = 'bg-gray-50 p-4 rounded-lg border flex justify-between items-start';
+        noteDiv.innerHTML = `
+            <div>
+                <p class="text-gray-800">${note.text}</p>
+                <p class="text-xs text-gray-500 mt-2">${new Date(note.timestamp.seconds * 1000).toLocaleString()}</p>
+            </div>
+            <button class="delete-note-btn text-gray-400 hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
+        `;
         notesContainer.prepend(noteDiv);
+
+        noteDiv.querySelector('.delete-note-btn').addEventListener('click', () => {
+            noteToDelete = note;
+            deleteNoteModal.classList.remove('hidden');
+        });
     }
     
-    // --- Fetches and re-renders all notes ---
+    // --- Refreshes the notes list ---
     function refreshNotes() {
         db.collection('jobs').doc(jobId).get().then(doc => {
+            notesContainer.innerHTML = ''; // Clear old notes first
             if (doc.exists && doc.data().notes) {
-                notesContainer.innerHTML = '';
                 doc.data().notes.sort((a, b) => b.timestamp - a.timestamp).forEach(renderNote);
             }
         });
@@ -87,9 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
             jobCompany.textContent = job.company;
             jobDate.textContent = job.appliedDate;
             jobStatusBadge.textContent = job.status;
-            jobStatusBadge.className = `px-3 py-1 rounded-full text-sm font-medium status-${job.status.toLowerCase()}`;
+            jobStatusBadge.className = `text-xs font-semibold px-3 py-1 rounded-full ${'status-' + job.status.toLowerCase()}`;
             
-            // Populate status dropdown
             ['Applied', 'Interview', 'Offer', 'Rejected'].forEach(status => {
                 const option = document.createElement('option');
                 option.value = status;
@@ -98,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateStatus.appendChild(option);
             });
             
-            refreshNotes(); // Initial load of notes
+            refreshNotes();
         }
     });
 
@@ -119,16 +109,20 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('Application updated!');
             if (noteText) {
                 newNoteInput.value = '';
-                refreshNotes(); // Refresh to show the new note
+                refreshNotes();
             }
             jobStatusBadge.textContent = updateStatus.value;
-            jobStatusBadge.className = `px-3 py-1 rounded-full text-sm font-medium status-${updateStatus.value.toLowerCase()}`;
+            jobStatusBadge.className = `text-xs font-semibold px-3 py-1 rounded-full ${'status-' + updateStatus.value.toLowerCase()}`;
         }).catch(() => showNotification('Update failed.', false));
     });
 
-    // --- Event Listeners for Application Deletion ---
-    deleteJobBtn.addEventListener('click', () => deleteAppModal.classList.remove('hidden'));
-    cancelAppDelete.addEventListener('click', () => deleteAppModal.classList.add('hidden'));
+    // --- Application Deletion Logic ---
+    deleteJobBtn.addEventListener('click', () => {
+        deleteAppModal.classList.remove('hidden');
+    });
+    cancelAppDelete.addEventListener('click', () => {
+        deleteAppModal.classList.add('hidden');
+    });
     confirmAppDelete.addEventListener('click', () => {
         db.collection('jobs').doc(jobId).delete().then(() => {
             showNotification('Application deleted.');
@@ -136,16 +130,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }).catch(() => showNotification('Deletion failed.', false));
     });
 
-    // --- Event Listeners for Note Deletion ---
-    cancelNoteDelete.addEventListener('click', () => deleteNoteModal.classList.add('hidden'));
+    // --- Note Deletion Logic ---
+    cancelNoteDelete.addEventListener('click', () => {
+        deleteNoteModal.classList.add('hidden');
+    });
     confirmNoteDelete.addEventListener('click', () => {
         if (!noteToDelete) return;
-
         db.collection('jobs').doc(jobId).update({
             notes: firebase.firestore.FieldValue.arrayRemove(noteToDelete)
         }).then(() => {
             showNotification('Note deleted.');
-            refreshNotes(); // Refresh notes list
+            refreshNotes();
             deleteNoteModal.classList.add('hidden');
             noteToDelete = null;
         }).catch(() => showNotification('Could not delete note.', false));
