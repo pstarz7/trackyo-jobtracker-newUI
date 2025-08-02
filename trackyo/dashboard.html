@@ -66,21 +66,29 @@
             <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-8">
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-white p-5 rounded-xl shadow">
+                    <div id="totalAppsCard" class="bg-white p-5 rounded-xl shadow cursor-pointer hover:shadow-lg transition-shadow">
                         <h4 class="text-sm text-gray-500">Total Applications</h4>
                         <p id="totalAppsStat" class="text-3xl font-bold text-gray-800">0</p>
                     </div>
-                    <div class="bg-white p-5 rounded-xl shadow">
+                    <div id="interviewCard" class="bg-white p-5 rounded-xl shadow cursor-pointer hover:shadow-lg transition-shadow">
                         <h4 class="text-sm text-gray-500">Interviews</h4>
                         <p id="interviewStat" class="text-3xl font-bold text-yellow-500">0</p>
                     </div>
-                     <div class="bg-white p-5 rounded-xl shadow">
+                     <div id="offerCard" class="bg-white p-5 rounded-xl shadow cursor-pointer hover:shadow-lg transition-shadow">
                         <h4 class="text-sm text-gray-500">Offers</h4>
                         <p id="offerStat" class="text-3xl font-bold text-green-500">0</p>
                     </div>
-                     <div class="bg-white p-5 rounded-xl shadow">
+                     <div id="rejectedCard" class="bg-white p-5 rounded-xl shadow cursor-pointer hover:shadow-lg transition-shadow">
                         <h4 class="text-sm text-gray-500">Rejected</h4>
                         <p id="rejectedStat" class="text-3xl font-bold text-red-500">0</p>
+                    </div>
+                </div>
+
+                <!-- Filter Status Display -->
+                <div id="filterStatus" class="hidden mb-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center">
+                        <p class="text-gray-700">Currently showing: <span id="filterText" class="font-bold text-blue-600"></span></p>
+                        <button id="clearFilterBtn" class="text-sm font-semibold text-gray-500 hover:text-red-500">&times; Clear Filter</button>
                     </div>
                 </div>
 
@@ -92,64 +100,25 @@
         </div>
     </div>
 
-    <!-- Add/Edit Job Modal -->
-    <div id="addJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-20">
-        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-lg mx-4">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6">Add New Application</h2>
-            <form id="jobForm" class="space-y-4">
-                <input id="jobCompany" type="text" placeholder="Company Name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
-                <input id="jobRole" type="text" placeholder="Job Role" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
-                <input id="jobDate" type="date" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
-                <select id="jobStatus" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                    <option>Applied</option>
-                    <option>Interview</option>
-                    <option>Offer</option>
-                    <option>Rejected</option>
-                </select>
-                <div class="flex justify-end space-x-4 pt-4">
-                    <button type="button" id="cancelJobBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="submit" id="saveJobBtn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteConfirmationModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center hidden z-20">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4 text-center">
-            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
-            </div>
-            <h3 class="text-lg font-medium text-gray-900 mt-4">Delete Application</h3>
-            <p class="text-sm text-gray-500 mt-2">Are you sure? This cannot be undone.</p>
-            <div class="flex justify-center space-x-4 mt-6">
-                <button id="cancelDeleteBtn" class="px-4 py-2 bg-gray-300 rounded-md">Cancel</button>
-                <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded-md">Confirm</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Notification Pop-up Card -->
+    <!-- Modals and Notifications -->
+    <div id="addJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-20"></div>
+    <div id="deleteConfirmationModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center hidden z-20"></div>
     <div id="notificationCard" class="fixed top-5 right-5 hidden z-30"></div>
 
-    <!-- Firebase and App Scripts -->
+    <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
     <script src="js/firebase-config.js"></script>
     <script src="js/app.js"></script>
-
-    <!-- Script for mobile sidebar toggle -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const sidebar = document.getElementById('sidebar');
             const openSidebarBtn = document.getElementById('openSidebarBtn');
             const closeSidebarBtn = document.getElementById('closeSidebarBtn');
-
             openSidebarBtn.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
             closeSidebarBtn.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
         });
     </script>
 </body>
 </html>
-
